@@ -1,0 +1,23 @@
+# Archivos de credenciales
+client_secret.json
+llyc-adtech-pruebas-*.json
+token.json
+
+# Entorno virtual
+mcp_venv/
+venv/
+.env/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos temporales de sistema
+*.log
+*.tmp
+*.swp
+
+# Configuración local
+*.env
