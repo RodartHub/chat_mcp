@@ -21,3 +21,4 @@ __pycache__/
 
 # Configuración local
 *.env
+.vscode/
