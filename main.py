@@ -1,54 +1,16 @@
 import asyncio
 import os
-import pickle
-from contextlib import AsyncExitStack
-from typing import Optional, List, Dict, Any
-
 import google.generativeai as genai
 import gradio as gr
 from dotenv import load_dotenv
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-
+from typing import Optional, List, Dict, Any
+from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-# ========================
-# CONFIG
-# ========================
 load_dotenv()
-SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
-
-# ========================
-# OAUTH HANDLER
-# ========================
-def get_oauth_credentials():
-    creds = None
-    token_path = "token.pickle"
-
-    if os.path.exists(token_path):
-        with open(token_path, "rb") as token:
-            creds = pickle.load(token)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # El archivo client_secret.json debe venir de GCP (OAuth Client ID tipo Desktop App)
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "client_secret.json", SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-
-        with open(token_path, "wb") as token:
-            pickle.dump(creds, token)
-
-    return creds
 
 
-# ========================
-# MCP CLIENT
-# ========================
 def clean_schema_for_gemini(schema: dict) -> dict:
     if not isinstance(schema, dict):
         return schema
@@ -75,19 +37,11 @@ class MCPClient:
         self.model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-1.5-turbo'))
 
     async def connect_to_server(self):
-        creds = get_oauth_credentials()
-        
-        # Guardamos el token temporalmente para que el MCP lo use
-        token_json_path = "oauth_token.json"
-        with open(token_json_path, "w") as f:
-            f.write(creds.to_json())
-
         server_params = StdioServerParameters(
             command="google-analytics-mcp",
             args=[],
-            env={"OAUTH_TOKEN_PATH": token_json_path}
+            env={"GOOGLE_APPLICATION_CREDENTIALS": os.getenv("GOOGLE_APPLICATION_CREDENTIALS")}
         )
-
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
         self.stdio, self.write = stdio_transport
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
@@ -185,27 +139,30 @@ class MCPClient:
         await self.exit_stack.aclose()
 
 
-# ========================
-# GRADIO
-# ========================
+# ---------- Gradio Integration ----------
 client = MCPClient()
 loop = asyncio.get_event_loop()
+
 
 async def init_client():
     tools = await client.connect_to_server()
     print(f"✅ Conectado. Herramientas disponibles: {tools}")
     return tools
 
+
 async def chat_response(message, history):
     return await client.process_query(message)
 
+
+# Lanzar Gradio
 def start_gradio():
     loop.run_until_complete(init_client())
     gr.ChatInterface(
         fn=lambda msg, hist: loop.run_until_complete(chat_response(msg, hist)),
-        title="MCP + Gemini Chat (OAuth)",
-        description="Interfaz con autenticación OAuth para Google Analytics",
+        title="MCP + Gemini Chat",
+        description="Interfaz para interactuar con Gemini y MCP Tools",
     ).launch(server_name="0.0.0.0", server_port=7860)
+
 
 if __name__ == "__main__":
     start_gradio()
