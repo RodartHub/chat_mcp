@@ -1,18 +1,26 @@
-# Usa una imagen ligera de Python
 FROM python:3.10-slim
 
-# Configura el directorio de trabajo
+# Instalar dependencias del sistema en una sola capa
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copia los archivos necesarios
-COPY . .
+# Copiar solo requirements para aprovechar cache
+COPY requirements.txt .
 
-# Instala dependencias
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir -e './google-analytics-mcp[dev]'
+# Instalar dependencias de Python
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt
 
+# Copiar e instalar el paquete google-analytics-mcp
+COPY ./google-analytics-mcp ./google-analytics-mcp
+RUN pip install -e './google-analytics-mcp[dev]'
 
-# Comando de arranque
+# Copiar el código principal
+COPY main.py .
+
+# Comando por defecto
 CMD ["python", "main.py"]
-

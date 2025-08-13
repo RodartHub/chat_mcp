@@ -113,27 +113,50 @@ class MCPClient:
             if response.candidates and response.candidates[0].content.parts:
                 parts = response.candidates[0].content.parts
                 final_parts = []
+
                 for part in parts:
                     if hasattr(part, 'function_call') and part.function_call:
                         fc = part.function_call
                         args = dict(fc.args) if hasattr(fc, 'args') else {}
                         tool_result = await self.execute_tool_call(fc.name, args)
+
+                        # Buscar el schema original de la herramienta
+                        tool_schema = None
+                        for t in available_tools:
+                            if t.name == fc.name and hasattr(t, 'inputSchema'):
+                                tool_schema = clean_schema_for_gemini(t.inputSchema)
+                                break
+
+                        # Determinar la key de salida correcta
+                        if tool_schema and "properties" in tool_schema and tool_schema["properties"]:
+                            first_key = list(tool_schema["properties"].keys())[0]
+                            response_payload = {first_key: tool_result}
+                        else:
+                            response_payload = {"output": tool_result}
+
                         follow_up = [
                             {"role": "user", "parts": [{"text": query}]},
                             {"role": "model", "parts": [{"function_call": fc}]},
                             {"role": "user", "parts": [{"function_response": {
-                                "name": fc.name, "response": {"result": tool_result}
+                                "name": fc.name,
+                                "response": response_payload
                             }}]}
                         ]
+
                         final = self.model.generate_content(follow_up)
                         if final.text:
                             final_parts.append(final.text)
+
                     elif hasattr(part, 'text') and part.text:
                         final_parts.append(part.text)
+
                 return "\n".join(final_parts) if final_parts else "No response generated"
+
             return response.text if response.text else "No response generated"
+
         except Exception as e:
             return f"Error: {str(e)}"
+
 
     async def cleanup(self):
         await self.exit_stack.aclose()
@@ -156,13 +179,23 @@ async def chat_response(message, history):
 
 # Lanzar Gradio
 def start_gradio():
-    loop.run_until_complete(init_client())
+    async def gradio_handler(msg, hist):
+        if client.session is None:
+            try:
+                await init_client()
+            except Exception as e:
+                return f"⚠️ Error conectando al MCP server: {e}"
+        return await chat_response(msg, hist)
+
+    port = int(os.environ.get("PORT", 8080))  # siempre usa PORT si existe
     gr.ChatInterface(
-        fn=lambda msg, hist: loop.run_until_complete(chat_response(msg, hist)),
+        fn=gradio_handler,
         title="MCP + Gemini Chat",
         description="Interfaz para interactuar con Gemini y MCP Tools",
-    ).launch(server_name="0.0.0.0", server_port=7860)
-
+    ).launch(
+        server_name="0.0.0.0",
+        server_port=port,
+    )
 
 if __name__ == "__main__":
     start_gradio()
