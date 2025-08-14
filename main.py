@@ -1,19 +1,29 @@
+# main.py
 import asyncio
+import os
 import gradio as gr
 from connectors.ga4_connector import GA4Connector
 from services.mcp_manager import MCPManager
-from services.chat_service import ChatService
 
 async def run():
     manager = MCPManager()
-    await manager.register(GA4Connector())
 
-    chat_service = ChatService(manager)
+    ga4 = GA4Connector()
+    await ga4.connect_to_server()
+    await manager.register(ga4)
 
     async def handler(msg, hist):
-        return await chat_service.process_message(msg)
+        # Aquí podrías rutear a otros conectores según intención; de momento GA4:
+        return await ga4.process_query(msg)
 
-    gr.ChatInterface(fn=handler, title="Multi-MCP Chat").launch(server_name="0.0.0.0", server_port=8080)
+    gr.ChatInterface(
+        fn=handler,
+        title="Multi-MCP Chat",
+        description="Interfaz para interactuar con LLM y múltiples MCP tools",
+    ).launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 8080)),
+    )
 
 if __name__ == "__main__":
     asyncio.run(run())
