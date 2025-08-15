@@ -1,10 +1,13 @@
 # llm/gemini_llm.py
 
 import os
-from typing import Any, Callable, Dict, List
+import json
+from typing import Any, Dict, List
 import google.generativeai as genai
 from llm.base import LLMClient
 from tools.tool_converter import clean_schema_for_gemini
+from google.protobuf.struct_pb2 import Struct
+
 
 class GeminiLLM(LLMClient):
     def __init__(self, connectors: List[Any] = None):
@@ -45,19 +48,34 @@ class GeminiLLM(LLMClient):
             gemini_tools.append({"function_declarations": [function_declaration]})
         return gemini_tools
 
+    def _normalize_tool_result(self, result):
+        """
+        Convierte cualquier objeto devuelto por un MCP en un dict/texto serializable.
+        """
+        if isinstance(result, dict):
+            return result
+
+        if hasattr(result, "content") and result.content:
+            for c in result.content:
+                if hasattr(c, "text") and c.text:
+                    try:
+                        return json.loads(c.text)
+                    except Exception:
+                        return {"data": c.text}
+                    
+        if hasattr(result, "structuredContent") and result.structuredContent:
+            return result.structuredContent.get("result")
+
+        # Si no se puede parsear, lo devolvemos como texto
+        return {"data": str(result)}
+
     async def process_query(self, query: str) -> str:
-        """
-        Procesa el query soportando múltiples MCPs.
-        """
-        # 1. Combinar herramientas de todos los MCPs
         all_gemini_tools = []
         tool_connector_map = {}
 
         for connector_name, tools in self.tools_map.items():
             gemini_tools = self.convert_mcp_tools_to_gemini(tools)
             all_gemini_tools.extend(gemini_tools)
-
-            # Mapear nombre de función a conector
             for t in tools:
                 tool_connector_map[t.name] = connector_name
 
@@ -78,7 +96,7 @@ class GeminiLLM(LLMClient):
                 for part in parts:
                     if hasattr(part, 'function_call') and part.function_call:
                         fc = part.function_call
-                        args = dict(fc.args) if hasattr(fc, 'args') else {}
+                        args_dict = dict(fc.args) if hasattr(fc, 'args') else {}
 
                         connector_name = tool_connector_map.get(fc.name)
                         if not connector_name:
@@ -90,15 +108,31 @@ class GeminiLLM(LLMClient):
                             final_parts.append(f"⚠️ No se encontró instancia del conector {connector_name}")
                             continue
 
-                        tool_result = await connector.execute(fc.name, args)
+                        # Ejecutar herramienta y normalizar resultado
+                        tool_result_raw = await connector.execute(fc.name, args_dict)
+                        tool_result = self._normalize_tool_result(tool_result_raw)
 
+                        # Convertir args a Struct
+                        args_struct = Struct()
+                        args_struct.update(args_dict)
+
+                        # Convertir response a Struct
+                        resp_struct = Struct()
+                        resp_struct.update(tool_result)
+
+                        # Construir conversación de seguimiento
                         follow_up = [
                             {"role": "user", "parts": [{"text": query}]},
-                            {"role": "model", "parts": [{"function_call": fc}]},
+                            {"role": "model", "parts": [{
+                                "function_call": {
+                                    "name": fc.name,
+                                    "args": args_struct
+                                }
+                            }]},
                             {"role": "user", "parts": [{
                                 "function_response": {
                                     "name": fc.name,
-                                    "response": {"output": tool_result}
+                                    "response": resp_struct
                                 }
                             }]}
                         ]
@@ -116,4 +150,3 @@ class GeminiLLM(LLMClient):
 
         except Exception as e:
             return f"Error: {str(e)}"
-
