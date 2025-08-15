@@ -14,24 +14,3 @@ def clean_schema_for_gemini(schema: dict) -> dict:
     return cleaned
 
 
-def mcp_to_gemini(mcp_tools):
-    gemini_tools = []
-    for t in mcp_tools:
-        input_schema = getattr(t, "inputSchema", {}) or {}
-
-        # 🔹 Limpiar el esquema para eliminar title, additionalProperties, etc.
-        cleaned_schema = clean_schema_for_gemini(input_schema)
-
-        gemini_tool = {
-            "function_declarations": [
-                {
-                    "name": getattr(t, "name", "unnamed_tool"),
-                    "description": getattr(t, "description", ""),
-                    "parameters": cleaned_schema  # ✅ Ya limpio para Gemini
-                }
-            ]
-        }
-        gemini_tools.append(gemini_tool)
-    return gemini_tools
-
-

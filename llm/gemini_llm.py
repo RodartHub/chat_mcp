@@ -57,19 +57,20 @@ class GeminiLLM(LLMClient):
             gemini_tools = self.convert_mcp_tools_to_gemini(tools)
             all_gemini_tools.extend(gemini_tools)
 
-            # Mapear nombre de función a conector para ejecutarlo luego
+            # Mapear nombre de función a conector
             for t in tools:
                 tool_connector_map[t.name] = connector_name
 
         try:
-            # 2. Primera llamada a Gemini con todas las herramientas
-            response = self.model.generate_content(
-                query,
-                tools=all_gemini_tools if all_gemini_tools else None,
-                tool_config={'function_calling_config': {'mode': 'AUTO'}} if all_gemini_tools else None
-            )
+            if all_gemini_tools:
+                response = self.model.generate_content(
+                    query,
+                    tools=all_gemini_tools,
+                    tool_config={'function_calling_config': {'mode': 'AUTO'}}
+                )
+            else:
+                response = self.model.generate_content(query)
 
-            # 3. Procesar la respuesta
             if response.candidates and response.candidates[0].content.parts:
                 parts = response.candidates[0].content.parts
                 final_parts = []
@@ -79,7 +80,6 @@ class GeminiLLM(LLMClient):
                         fc = part.function_call
                         args = dict(fc.args) if hasattr(fc, 'args') else {}
 
-                        # Determinar a qué conector llamar
                         connector_name = tool_connector_map.get(fc.name)
                         if not connector_name:
                             final_parts.append(f"⚠️ No se encontró conector para la función {fc.name}")
@@ -92,7 +92,6 @@ class GeminiLLM(LLMClient):
 
                         tool_result = await connector.execute(fc.name, args)
 
-                        # Construir la segunda llamada para que Gemini continúe
                         follow_up = [
                             {"role": "user", "parts": [{"text": query}]},
                             {"role": "model", "parts": [{"function_call": fc}]},
@@ -117,3 +116,4 @@ class GeminiLLM(LLMClient):
 
         except Exception as e:
             return f"Error: {str(e)}"
+

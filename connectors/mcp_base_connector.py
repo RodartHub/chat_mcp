@@ -6,7 +6,6 @@ from mcp import ClientSession
 from llm.base import LLMClient
 from contextlib import AsyncExitStack
 from llm.gemini_llm import GeminiLLM
-from tools.tool_converter import mcp_to_gemini
 from typing import Optional, List, Dict, Any
 from tools.tool_converter import clean_schema_for_gemini
 
@@ -39,29 +38,3 @@ class MCPBaseConnector(ABC):
         ...
 
     # ---- Común: orquesta LLM + Tools (function calling) ----
-
-
-
-    # ---- Helpers ----
-    def _stringify_tool_result(self, result: Any) -> str:
-        """Convierte la respuesta de MCP a texto (como hacías antes)."""
-        # Respuesta típica de MCP: tiene .content con Partes de texto/data
-        try:
-            content = getattr(result, "content", None)
-            if content:
-                out: List[str] = []
-                for c in content:
-                    if hasattr(c, "text") and c.text:
-                        out.append(c.text)
-                    elif hasattr(c, "data"):
-                        out.append(str(c.data))
-                    else:
-                        out.append(str(c))
-                return "\n".join(out) if out else "Tool executed successfully but returned no content"
-        except Exception:
-            pass
-
-        # Si ya es str o lista simple
-        if isinstance(result, (list, tuple)):
-            return "\n".join(str(x) for x in result)
-        return str(result)
