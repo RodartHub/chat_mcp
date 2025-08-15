@@ -1,4 +1,5 @@
 # llm/gemini_llm.py
+
 import os
 from typing import Any, Callable, Dict, List
 import google.generativeai as genai
@@ -13,59 +14,6 @@ class GeminiLLM(LLMClient):
             raise RuntimeError("❌ GEMINI_API_KEY no configurado")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-turbo"))
-
-    async def generate_with_tools(
-        self,
-        query: str,
-        tools: List[Dict[str, Any]],
-        tool_caller: Callable[[str, Dict[str, Any]], Any],
-    ) -> str:
-        # 1) Primer turno: pedir a Gemini (AUTO function calling)
-        response = self.model.generate_content(
-            query,
-            tools=tools if tools else None,
-            tool_config={'function_calling_config': {'mode': 'AUTO'}} if tools else None,
-        )
-
-        # Si no hay candidates, devolvemos lo que haya
-        if not getattr(response, "candidates", None):
-            return getattr(response, "text", "No response generated")
-
-        parts = response.candidates[0].content.parts
-        final_chunks: List[str] = []
-
-        # 2) Procesar parts (function_call o texto)
-        for part in parts:
-            fc = getattr(part, "function_call", None)
-            if fc:
-                # Ejecutar tool
-                args = dict(getattr(fc, "args", {}) or {})
-                tool_output = await tool_caller(fc.name, args)
-
-                # Estructura de follow-up al estilo Gemini
-                follow_up = [
-                    {"role": "user", "parts": [{"text": query}]},
-                    {"role": "model", "parts": [{"function_call": fc}]},
-                    {"role": "user", "parts": [{
-                        "function_response": {
-                            "name": fc.name,
-                            "response": {"output": tool_output}
-                        }
-                    }]}
-                ]
-                follow_response = self.model.generate_content(follow_up)
-                if getattr(follow_response, "text", None):
-                    final_chunks.append(follow_response.text)
-            else:
-                if getattr(part, "text", None):
-                    final_chunks.append(part.text)
-
-        # 3) Si no hubo parts, usar response.text
-        if not final_chunks:
-            return getattr(response, "text", "No response generated")
-
-        return "\n".join(final_chunks)
-    
 
     def convert_mcp_tools_to_gemini(self, mcp_tools: List) -> List[Dict]:
         gemini_tools = []
@@ -96,3 +44,76 @@ class GeminiLLM(LLMClient):
                     function_declaration["parameters"]["required"] = schema["required"]
             gemini_tools.append({"function_declarations": [function_declaration]})
         return gemini_tools
+
+    async def process_query(self, query: str) -> str:
+        """
+        Procesa el query soportando múltiples MCPs.
+        """
+        # 1. Combinar herramientas de todos los MCPs
+        all_gemini_tools = []
+        tool_connector_map = {}
+
+        for connector_name, tools in self.tools_map.items():
+            gemini_tools = self.convert_mcp_tools_to_gemini(tools)
+            all_gemini_tools.extend(gemini_tools)
+
+            # Mapear nombre de función a conector para ejecutarlo luego
+            for t in tools:
+                tool_connector_map[t.name] = connector_name
+
+        try:
+            # 2. Primera llamada a Gemini con todas las herramientas
+            response = self.model.generate_content(
+                query,
+                tools=all_gemini_tools if all_gemini_tools else None,
+                tool_config={'function_calling_config': {'mode': 'AUTO'}} if all_gemini_tools else None
+            )
+
+            # 3. Procesar la respuesta
+            if response.candidates and response.candidates[0].content.parts:
+                parts = response.candidates[0].content.parts
+                final_parts = []
+
+                for part in parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        fc = part.function_call
+                        args = dict(fc.args) if hasattr(fc, 'args') else {}
+
+                        # Determinar a qué conector llamar
+                        connector_name = tool_connector_map.get(fc.name)
+                        if not connector_name:
+                            final_parts.append(f"⚠️ No se encontró conector para la función {fc.name}")
+                            continue
+
+                        connector = next((c for c in self.connectors if c.name == connector_name), None)
+                        if not connector:
+                            final_parts.append(f"⚠️ No se encontró instancia del conector {connector_name}")
+                            continue
+
+                        tool_result = await connector.execute(fc.name, args)
+
+                        # Construir la segunda llamada para que Gemini continúe
+                        follow_up = [
+                            {"role": "user", "parts": [{"text": query}]},
+                            {"role": "model", "parts": [{"function_call": fc}]},
+                            {"role": "user", "parts": [{
+                                "function_response": {
+                                    "name": fc.name,
+                                    "response": {"output": tool_result}
+                                }
+                            }]}
+                        ]
+
+                        final = self.model.generate_content(follow_up)
+                        if final.text:
+                            final_parts.append(final.text)
+
+                    elif hasattr(part, 'text') and part.text:
+                        final_parts.append(part.text)
+
+                return "\n".join(final_parts) if final_parts else "No response generated"
+
+            return response.text if response.text else "No response generated"
+
+        except Exception as e:
+            return f"Error: {str(e)}"

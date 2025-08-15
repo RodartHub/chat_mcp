@@ -8,23 +8,13 @@ class LLMClient(ABC):
     def __init__(self, connectors: List[Any] = None):
         """Inicializa el cliente LLM con conectores opcionales."""
         self.connectors = connectors or []
-        self.sessions = {}  # clave: nombre conector, valor: sesión o client
-        self.tools_map = {} # clave: nombre conector, valor: lista de tools
+        self.sessions = {}  
+        self.tools_map = {} 
 
     @abstractmethod
-    async def generate_with_tools(
-        self,
-        query: str,
-        tools: List[Dict[str, Any]],
-        tool_caller: Callable[[str, Dict[str, Any]], Any],
-    ) -> str:
-        """Genera respuesta usando function calling."""
+    async def process_query(self, query: str) -> str:
+        """Procesa un query y devuelve la respuesta generada."""
         raise NotImplementedError
-
-    # @abstractmethod
-    # async def process_query(self, query: str) -> str:
-    #     """Procesa un query y devuelve la respuesta generada."""
-    #     raise NotImplementedError
 
     async def connect_to_servers(self):
         """Inicializa todos los MCPs y almacena sus tools."""
