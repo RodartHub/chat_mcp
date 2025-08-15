@@ -1,23 +1,18 @@
 def clean_schema_for_gemini(schema: dict) -> dict:
     if not isinstance(schema, dict):
         return schema
-    
-    allowed_keys = {"type", "properties", "required", "description", "enum", "items"}
-    
     cleaned = {}
     for k, v in schema.items():
-        # Saltar campos no permitidos
-        if k not in allowed_keys:
+        if k == "additionalProperties":
             continue
-        
         if isinstance(v, dict):
             cleaned[k] = clean_schema_for_gemini(v)
         elif isinstance(v, list):
             cleaned[k] = [clean_schema_for_gemini(i) for i in v]
         else:
             cleaned[k] = v
-    
     return cleaned
+
 
 def mcp_to_gemini(mcp_tools):
     gemini_tools = []

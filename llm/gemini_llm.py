@@ -3,14 +3,16 @@ import os
 from typing import Any, Callable, Dict, List
 import google.generativeai as genai
 from llm.base import LLMClient
+from tools.tool_converter import clean_schema_for_gemini
 
 class GeminiLLM(LLMClient):
-    def __init__(self, model_name: str | None = None, api_key: str | None = None):
-        api_key = api_key or os.getenv("GEMINI_API_KEY")
+    def __init__(self, connectors: List[Any] = None):
+        super().__init__(connectors)
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise RuntimeError("❌ GEMINI_API_KEY no configurado")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name or os.getenv("GEMINI_MODEL", "gemini-1.5-turbo"))
+        self.model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-turbo"))
 
     async def generate_with_tools(
         self,
@@ -63,3 +65,34 @@ class GeminiLLM(LLMClient):
             return getattr(response, "text", "No response generated")
 
         return "\n".join(final_chunks)
+    
+
+    def convert_mcp_tools_to_gemini(self, mcp_tools: List) -> List[Dict]:
+        gemini_tools = []
+        for tool in mcp_tools:
+            function_declaration = {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": {"type": "object", "properties": {}, "required": []}
+            }
+            if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                schema = clean_schema_for_gemini(tool.inputSchema)
+                if "properties" in schema:
+                    cleaned_props = {}
+                    for prop_name, prop_schema in schema["properties"].items():
+                        cleaned_prop = {}
+                        if isinstance(prop_schema, dict):
+                            if "type" in prop_schema:
+                                cleaned_prop["type"] = prop_schema["type"]
+                            if "description" in prop_schema:
+                                cleaned_prop["description"] = prop_schema["description"]
+                            if "enum" in prop_schema:
+                                cleaned_prop["enum"] = prop_schema["enum"]
+                            if prop_schema.get("type") == "array":
+                                cleaned_prop["items"] = prop_schema.get("items", {"type": "string"})
+                        cleaned_props[prop_name] = cleaned_prop
+                    function_declaration["parameters"]["properties"] = cleaned_props
+                if "required" in schema:
+                    function_declaration["parameters"]["required"] = schema["required"]
+            gemini_tools.append({"function_declarations": [function_declaration]})
+        return gemini_tools

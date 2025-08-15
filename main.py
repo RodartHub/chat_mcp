@@ -4,17 +4,29 @@ import os
 import gradio as gr
 from connectors.ga4_connector import GA4Connector
 from services.mcp_manager import MCPManager
+from llm.gemini_llm import GeminiLLM
+
+llm_client = GeminiLLM(connectors=[
+    GA4Connector(), 
+    # Aquí podrías añadir más MCPs en el futuro
+])
+
+async def init_client():
+    tools_by_connector = await llm_client.connect_to_servers()
+    print("✅ Herramientas cargadas:")
+    for name, tools in tools_by_connector.items():
+        print(f"  - {name}: {len(tools)} tools")
 
 async def run():
-    manager = MCPManager()
-
-    ga4 = GA4Connector()
-    await ga4.connect_to_server()
-    await manager.register(ga4)
-
     async def handler(msg, hist):
-        # Aquí podrías rutear a otros conectores según intención; de momento GA4:
-        return await ga4.process_query(msg)
+        if not llm_client.tools_map:
+            try:
+                await init_client()
+            except Exception as e:
+                return f"⚠️ Error conectando a los MCP servers: {e}"
+
+        return await llm_client.process_query(msg)
+
 
     gr.ChatInterface(
         fn=handler,
