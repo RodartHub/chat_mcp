@@ -10,7 +10,7 @@ from tools.tool_converter import clean_schema_for_gemini
 
 class GA4Connector(MCPBaseConnector):
     def __init__(self):
-        super().__init__(name="GA4")
+        super().__init__(name="GA4", cached_tools=None)
         
     async def connect_to_server(self):
         creds_path = self._prepare_credentials()
@@ -27,12 +27,6 @@ class GA4Connector(MCPBaseConnector):
         self.cached_tools = (await self.session.list_tools()).tools
         print(f"✅ Conectado. Herramientas disponibles: {[tool.name for tool in self.cached_tools]}")
         return self.cached_tools
-    
-    async def list_tools(self):
-        return getattr(self, "cached_tools", [])
-
-    async def execute(self, tool_name, args):
-        return await self.session.call_tool(tool_name, args)
 
     def _prepare_credentials(self):
         creds_var = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")

@@ -18,7 +18,8 @@ class MCPBaseConnector(ABC):
       - execute(tool_name, args)
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, cached_tools: Optional[List[Any]] = None):
+        self.cached_tools = cached_tools or []
         self.name = name
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
@@ -29,12 +30,13 @@ class MCPBaseConnector(ABC):
     async def connect_to_server(self) -> Any:
         ...
 
-    @abstractmethod
     async def list_tools(self) -> List[Any]:
-        ...
+        """Devuelve las herramientas disponibles en el MCP."""
+        return self.cached_tools
 
-    @abstractmethod
     async def execute(self, tool_name: str, args: Dict[str, Any]) -> Any:
-        ...
+        if not self.session:
+            raise RuntimeError("No hay sesión activa.")
+        return await self.session.call_tool(tool_name, args)
 
     # ---- Común: orquesta LLM + Tools (function calling) ----
