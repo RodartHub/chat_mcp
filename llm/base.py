@@ -5,11 +5,13 @@ from typing import Any, Callable, List, Dict
 class LLMClient(ABC):
     """Estrategia de LLM intercambiable (Gemini, Claude, GPT, etc.)."""
 
-    def __init__(self, connectors: List[Any] = None):
+    def __init__(self, connectors: List[Any] = None, conversation_history: List[Any] = None, session_context: Dict[str, Any] = None):
         """Inicializa el cliente LLM con conectores opcionales."""
         self.connectors = connectors or []
         self.sessions = {}  
         self.tools_map = {} 
+        self.conversation_history = conversation_history or []
+        self.session_context = session_context or {}
 
     @abstractmethod
     async def process_query(self, query: str) -> str:
