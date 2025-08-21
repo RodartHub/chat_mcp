@@ -26,7 +26,7 @@ def make_request(endpoint, payload=None, method='GET'):
     headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': f"{MEDIATOOL_TOKEN}"
+        'Authorization': f"Bearer {MEDIATOOL_TOKEN}"
     }
 
     try:
