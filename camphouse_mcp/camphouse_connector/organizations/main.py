@@ -41,6 +41,20 @@ def get_list_partners_organization(organization_id: str) -> Dict[str, List[Dict[
 
     endpoint = f"organizations/{organization_id}/partners"
     return make_request(endpoint, method='GET')
+
+
+@mcp.tool(title="Camphouse: Get all campaigns of an organization")
+def get_organization_campaigns(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Camphouse: Get all campaigns of a specific organization by its ID.
+    Args:
+        organization_id (str): The ID of the organization to retrieve campaigns for.
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each campaign.
+    """
+
+    endpoint = f"organizations/{organization_id}/campaigns"
+    return make_request(endpoint, method='GET')
     
            
 
