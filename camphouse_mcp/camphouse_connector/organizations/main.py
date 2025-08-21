@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-from tools.requests import make_request
+from camphouse_mcp.tools.requests import make_request
 from ...coordinator import mcp
 
 @mcp.tool(title="Get organization details")
