@@ -15,8 +15,8 @@ class CamphouseConnector(MCPBaseConnector):
     async def connect_to_server(self):
         creds_path = self._prepare_credentials()
         server_params = StdioServerParameters(
-            command="camphouse-mcp",
-            args=[],
+            command="python",   
+            args=["-m", "camphouse_mcp.server"],  
             env={"CAMPHOUSE_TOKEN_ID": creds_path}
         )
         self.stdio, self.write = await self.exit_stack.enter_async_context(stdio_client(server_params))
