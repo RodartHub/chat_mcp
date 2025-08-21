@@ -3,10 +3,13 @@ import asyncio
 import os
 import gradio as gr
 from connectors.ga4_connector import GA4Connector
+from connectors.camphouse_connector import CamphouseConnector
 from llm.gemini_llm import GeminiLLM
 
+
 llm_client = GeminiLLM(connectors=[
-    GA4Connector(), 
+    GA4Connector(),
+    CamphouseConnector(),
     # Aquí podrías añadir más MCPs en el futuro
 ])
 
