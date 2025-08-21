@@ -1,0 +1,19 @@
+[project]
+name = "camphouse_mcp"
+version = "0.1.0"
+requires-python = ">=3.9, <3.14"
+license = "Apache-2.0"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.2.0",
+]
+
+[project.scripts]
+camphouse_mcp = "camphouse_mcp.server:run_server"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "nox >= 2020.12.31, < 2022.6"
+]
+
