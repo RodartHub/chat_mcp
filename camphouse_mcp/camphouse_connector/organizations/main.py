@@ -55,6 +55,34 @@ def get_organization_campaigns(organization_id: str) -> Dict[str, List[Dict[str,
 
     endpoint = f"organizations/{organization_id}/campaigns"
     return make_request(endpoint, method='GET')
+
+@mcp.tool(title="Camphouse: Get all media types of an organization")
+def get_organization_mediatypes(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Camphouse: Get all media types of a specific organization by its ID.
+    Media types are the different mediums in which advertisement is made such as TV, Radio, SEM, Online Video. Organizations create their own media types and can have as many as they like. Media entries must always be connected to a media type.
+    Args:
+        organization_id (str): The ID of the organization to retrieve media types for.
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each media type.
+    """
+
+    endpoint = f"organizations/{organization_id}/media_types"
+    return make_request(endpoint, method='GET')
+
+@mcp.tool(title="Camphouse: Get all vehicles of an organization")
+def get_organization_vehicles(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Camphouse: Get all vehicles of a specific organization by its ID.
+    Vehicles are the different channels that advertisement are made throuhg. For TV they can be Fox News, BBC etc. Each vehicle must be connected to an organization and a media type. Each media entry must be connected to a vehicle.
+    Args:
+        organization_id (str): The ID of the organization to retrieve vehicles for.
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each vehicle.
+    """
+
+    endpoint = f"organizations/{organization_id}/vehicles"
+    return make_request(endpoint, method='GET')
     
            
 
