@@ -15,8 +15,8 @@ COPY requirements.txt .
 RUN pip install --upgrade pip \
  && pip install -r requirements.txt
 
-# Copiar e instalar el paquete google-analytics-mcp
-COPY ./google-analytics-mcp ./google-analytics-mcp
+# Copiar todo el código fuente
+COPY . .
 RUN pip install -e './google-analytics-mcp[dev]'
 
 # Copiar el código principal
