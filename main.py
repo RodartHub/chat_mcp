@@ -10,7 +10,6 @@ from llm.gemini_llm import GeminiLLM
 llm_client = GeminiLLM(connectors=[
     GA4Connector(),
     CamphouseConnector(),
-    # Aquí podrías añadir más MCPs en el futuro
 ])
 
 async def init_client():
@@ -36,5 +35,20 @@ async def run():
         server_port=int(os.environ.get("PORT", 8080)),
     )
 
+
+def main():
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        # Ya hay un loop corriendo (ej. dentro de MCP)
+        loop.create_task(run())
+    else:
+        # Local, podemos iniciar nuestro propio loop
+        asyncio.run(run())
+
+
 if __name__ == "__main__":
-    asyncio.run(run())
+    main()
