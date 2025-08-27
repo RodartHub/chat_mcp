@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List
 from camphouse_mcp.tools.requests import make_request
 from ...coordinator import mcp
@@ -83,6 +84,19 @@ def get_organization_vehicles(organization_id: str) -> Dict[str, List[Dict[str, 
 
     endpoint = f"organizations/{organization_id}/vehicles"
     return make_request(endpoint, method='GET')
-    
-           
 
+
+@mcp.tool(title="Camphouse: Get all data fields of an organization")
+def get_data_fields_for_organization(organization_id: str) -> Dict:
+    """
+    Camphouse: Get all data fields associated with a specific organization by its ID.
+    Args:
+        organization_id (str): The ID of the organization to retrieve data fields for.
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each data field.
+    """
+    payload = {
+        "q": json.dumps({"organizationId": str(organization_id)})
+    }
+
+    return make_request("fields", payload=payload, method='GET')
