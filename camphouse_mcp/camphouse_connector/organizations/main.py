@@ -1,3 +1,4 @@
+import os
 import json
 from typing import Any, Dict, List
 from camphouse_mcp.tools.requests import make_request
@@ -100,3 +101,19 @@ def get_data_fields_for_organization(organization_id: str) -> Dict:
     }
 
     return make_request("fields", payload=payload, method='GET')
+
+@mcp.tool(title="Camphouse: Get all media entries for an organization")
+def get_media_entries_for_organization(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Camphouse: Get all media entries associated with a specific organization by its ID.
+    Args:
+        organization_id (str): The ID of the organization to retrieve media entries for.
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each media entry.
+    """
+
+    payload = {
+        "q": json.dumps({"organizationId": str(organization_id)})
+    }
+
+    return make_request("searchmediaentries", payload=payload, method='GET')
