@@ -4,6 +4,8 @@ from typing import Any, Dict, List
 from camphouse_mcp.tools.requests import make_request
 from ...coordinator import mcp
 
+CAMPHOUSE_COMPANY_MAIN_ID = os.getenv("CAMPHOUSE_COMPANY_MAIN_ID", None)
+
 @mcp.tool(title="Camphouse: Get organization details")
 def get_organization(organization_id: str) -> Dict[str, Any]:
     """
@@ -18,16 +20,13 @@ def get_organization(organization_id: str) -> Dict[str, Any]:
     return make_request(endpoint, method='GET')
 
 @mcp.tool(title="Camphouse: Get all subsidiaries of an organization")
-def get_subsidiaries_organization(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
+def get_subsidiaries_organization() -> Dict[str, List[Dict[str, Any]]]:
     """
-    Camphouse: Get all subsidiaries of a specific organization by its ID.
-    Args:
-        organization_id (str): The ID of the organization to retrieve subsidiaries for.
+    Camphouse: Get all subsidiaries of the main organization associated with the provided token.
     Returns:
         Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each subsidiary.
     """
-
-    endpoint = f"organizations/{organization_id}/subsidiaries"
+    endpoint = f"organizations/{CAMPHOUSE_COMPANY_MAIN_ID}/subsidiaries"
     return make_request(endpoint, method='GET')
 
 
@@ -117,3 +116,61 @@ def get_media_entries_for_organization(organization_id: str) -> Dict[str, List[D
     }
 
     return make_request("searchmediaentries", payload=payload, method='GET')
+
+
+@mcp.tool(title="Camphouse: Aggregate media entries for an organization")
+def get_aggregate_media_entries(
+    organization_id: str,
+    media_type_id: str,
+    from_date: str,
+    to_date: str
+) -> List[Dict]:
+    """
+    Camphouse: Get aggregated media entries for a specific organization by media type and date range.
+    Args:
+        organization_id (str): The ID of the organization to aggregate media entries for.
+        media_type_id (str): The ID of the media type to filter by.
+        from_date (str): The start date for the aggregation (YYYY-MM-DD).
+        to_date (str): The end date for the aggregation (YYYY-MM-DD).
+    Returns:
+        List[Dict]: A list of dictionaries containing the aggregated media entry data.
+    """
+
+    payload = {
+        "query": {
+            "organizationId": [str(organization_id)],
+            "dateRange": {
+                "from": from_date,
+                "to": to_date
+            },
+            "_mt_entry_type": [
+                "planning",
+                "result",
+                "target"
+            ],
+            "mediaTypeId": [str(media_type_id)]
+        },
+        "aggregations": [
+            {
+                "measures": [
+                    "spend",
+                    "clicks",
+                    "impressions",
+                    "engagements",
+                    "conversions"
+                ],
+                "dimensions": [
+                    "campaign.name"
+                ],
+                "grain": "none",
+                "limitOptions": {
+                    "orderBy": "spend",
+                    "order": "desc",
+                    "size": 100,
+                    "groupOthers": True
+                }
+            }
+        ]
+    }
+
+    return make_request("aggregatemediaentries", payload=payload, method='POST')
