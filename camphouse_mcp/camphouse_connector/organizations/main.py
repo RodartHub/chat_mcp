@@ -2,6 +2,7 @@ import os
 import json
 from typing import Any, Dict, List
 from camphouse_mcp.tools.requests import make_request
+from ..mediatypes.main import get_mediatypes_data
 from ...coordinator import mcp
 
 CAMPHOUSE_COMPANY_MAIN_ID = os.getenv("CAMPHOUSE_COMPANY_MAIN_ID", None)
@@ -67,9 +68,12 @@ def get_organization_mediatypes(organization_id: str) -> Dict[str, List[Dict[str
     Returns:
         Dict[str, List[Dict[str, Any]]]: A dictionary containing a list of dictionaries with the details of each media type.
     """
+    campaigns = get_organization_campaigns(organization_id)
+    mediatypes_ids = [mt for c in campaigns.get('campaigns', []) for mt in c.get('mediaTypes', [])]
+    mediatypes_ids = list(set(mediatypes_ids))
+    mediatypes_data = get_mediatypes_data(mediatypes_ids)
 
-    endpoint = f"organizations/{organization_id}/media_types"
-    return make_request(endpoint, method='GET')
+    return {"mediaTypes": mediatypes_data}
 
 @mcp.tool(title="Camphouse: Get all vehicles of an organization")
 def get_organization_vehicles(organization_id: str) -> Dict[str, List[Dict[str, Any]]]:
